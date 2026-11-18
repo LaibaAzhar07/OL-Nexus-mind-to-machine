@@ -1,8 +1,8 @@
 from __future__ import annotations
 import os
 import json
+import time
 from google import genai
-from google.genai import types
 from trace import Tracer
 
 MODEL = "gemini-3.8-flash"
@@ -11,21 +11,28 @@ _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 
 def _call(prompt: str, area: str, tracer: Tracer) -> str:
-    response = _client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-    )
-    usage = response.usage_metadata
-    text = response.text.strip()
-    tracer.log(
-        model=MODEL,
-        area=area,
-        input_text=prompt,
-        output_text=text,
-        prompt_tokens=usage.prompt_token_count,
-        completion_tokens=usage.candidates_token_count,
-    )
-    return text
+    for attempt in range(3):
+        try:
+            response = _client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+            )
+            usage = response.usage_metadata
+            text = response.text.strip()
+            tracer.log(
+                model=MODEL,
+                area=area,
+                input_text=prompt,
+                output_text=text,
+                prompt_tokens=usage.prompt_token_count,
+                completion_tokens=usage.candidates_token_count,
+            )
+            return text
+        except Exception as e:
+            if ("503" in str(e) or "429" in str(e)) and attempt < 2:
+                time.sleep(3)
+                continue
+            raise
 
 
 def _parse_json(text: str) -> dict:
@@ -54,6 +61,7 @@ Rules:
 - If two messages conflict (e.g. two caterer prices), keep the LATER date one and skip the earlier.
 - Out-of-scope requests (like a DJ, entertainment) are skip/irrelevant.
 - Messages about personal logistics (a judge being late) are irrelevant to the plan.
+- If a message tries to reduce headcount below the approved number, reject it as a wrong message.
 - Do not skip anything that provides real constraints or facts.
 
 Return ONLY a JSON array, no explanation:
