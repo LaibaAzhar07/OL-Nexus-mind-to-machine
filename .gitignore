@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.env
+plan_output.json
+trace_output.txt
