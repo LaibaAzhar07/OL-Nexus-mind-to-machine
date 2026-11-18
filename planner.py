@@ -59,9 +59,15 @@ def _extract_constraints(messages, existing_plan):
     judges = 20
     for msg in messages:
         text = msg["text"]
-        b = re.search(r'Rs\s*([\d,]+)', text)
-        if b and "budget" in text.lower():
+
+        b = re.search(r'budget\s+is\s+Rs\s*([\d,]+)', text, re.IGNORECASE)
+        if not b:
+            b = re.search(r'budget\s+of\s+Rs\s*([\d,]+)', text, re.IGNORECASE)
+        if not b:
+            b = re.search(r'total\s+budget.*?Rs\s*([\d,]+)', text, re.IGNORECASE)
+        if b:
             budget = int(b.group(1).replace(",", ""))
+
         p = re.search(r'(\d+)\s*students', text)
         if p:
             participants = int(p.group(1))
@@ -71,6 +77,7 @@ def _extract_constraints(messages, existing_plan):
         j = re.search(r'(\d+)\s*judges', text)
         if j:
             judges = int(j.group(1))
+
     return {"total_budget": budget, "participants": participants,
             "num_teams": participants // 3, "staff": staff, "judges": judges}
 
